@@ -943,9 +943,9 @@ export default function App() {
 
   async function loginWithGoogle() {
     await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider: "google",
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: "https://album-da-copa-xi.vercel.app",
       },
     })
   }
