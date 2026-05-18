@@ -768,31 +768,34 @@ export default function App() {
 
   async function saveAlbumOnline() {
     if (!user) {
-      alert('Faça login para sincronizar online.')
+      alert("Faça login para sincronizar online.")
       return
     }
   
     setSyncing(true)
   
     const { error } = await supabase
-      .from('albums')
-      .upsert({
-        user_id: user.id,
-        album,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id',
-      })
+      .from("albums")
+      .upsert(
+        {
+          user_id: user.id,
+          album,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "user_id",
+        }
+      )
   
     setSyncing(false)
   
     if (error) {
-      alert('Erro ao salvar online.')
-      console.error(error)
+      console.error("Erro Supabase:", error)
+      alert(`Erro ao salvar online: ${error.message}`)
       return
     }
   
-    alert('Álbum salvo online.')
+    alert("Álbum salvo online.")
   }
 
   async function loadAlbumOnline() {
