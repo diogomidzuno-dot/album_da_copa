@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { supabase } from './supabase'
 
 const TEAM_CODES = {
   "México": "MEX",
@@ -744,10 +745,26 @@ export default function App() {
   const [unlockUnmark, setUnlockUnmark] = useState(false);
   const [syncConfig, setSyncConfigState] = useState(() => loadSyncConfig());
   const [syncStatus, setSyncStatus] = useState("");
+  const [user, setUser] = useState(null);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(album));
   }, [album]);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user)
+    })
+  
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null)
+    })
+  
+    return () => {
+      listener.subscription.unsubscribe()
+    }
+  }, [])
 
   function setSyncConfig(updater) {
     setSyncConfigState((prev) => {
@@ -807,6 +824,56 @@ export default function App() {
   function resetAlbum() {
     const confirmed = window.confirm("Deseja zerar todo o controle do álbum?");
     if (confirmed) setAlbum(createAlbum());
+  }
+  async function saveAlbumOnline() {
+    if (!user) {
+      alert('Faça login para sincronizar online.')
+      return
+    }
+  
+    setSyncing(true)
+  
+    const { error } = await supabase
+      .from('albums')
+      .upsert({
+        user_id: user.id,
+        album,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id',
+      })
+  
+    setSyncing(false)
+  
+    if (error) {
+      alert('Erro ao salvar online.')
+      console.error(error)
+      return
+    }
+  
+    alert('Álbum salvo online.')
+  }
+
+  async function loadAlbumOnline() {
+    if (!user) {
+      alert('Faça login para baixar o álbum online.')
+      return
+    }
+  
+    const { data, error } = await supabase
+      .from('albums')
+      .select('album')
+      .eq('user_id', user.id)
+      .single()
+  
+    if (error) {
+      alert('Nenhum álbum online encontrado.')
+      console.error(error)
+      return
+    }
+  
+    setAlbum(normalizeSavedAlbum(data.album))
+    alert('Álbum carregado online.')
   }
 
   async function handleImportBackup(event) {
@@ -873,6 +940,20 @@ export default function App() {
     return acc;
   }, {});
 
+  async function loginWithGoogle() {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    })
+  }
+  
+  async function logout() {
+    await supabase.auth.signOut()
+    setUser(null)
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 p-6 app-root">
       <style>{`
@@ -922,6 +1003,26 @@ export default function App() {
               </button>
             </div>
           </div>
+
+          {user ? (
+  <>
+    <button onClick={saveAlbumOnline} className="bg-purple-700 text-white rounded-xl px-4 py-2 font-bold">
+      {syncing ? 'Salvando...' : 'Salvar online'}
+    </button>
+
+    <button onClick={loadAlbumOnline} className="bg-indigo-700 text-white rounded-xl px-4 py-2 font-bold">
+      Baixar online
+    </button>
+
+    <button onClick={logout} className="bg-gray-700 text-white rounded-xl px-4 py-2 font-bold">
+      Sair
+    </button>
+  </>
+) : (
+  <button onClick={loginWithGoogle} className="bg-green-700 text-white rounded-xl px-4 py-2 font-bold">
+    Entrar com Google
+  </button>
+)}
 
           <div className="w-full h-5 bg-gray-200 rounded-full overflow-hidden mt-5 mb-2">
             <div className="h-full bg-green-600" style={{ width: `${stats.progress}%` }} />
