@@ -504,19 +504,70 @@ async function pullOnlineSync(config) {
   return normalizeSavedAlbum(album);
 }
 
-function generateRealPdf(album, stats){
-  const text = buildReportText(album, stats);
-  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
+function generateRealPdf(album, stats) {
+  const text = [
+    "RELATÓRIO DE FIGURINHAS FALTANTES",
+    "ÁLBUM COPA DO MUNDO 2026",
+    "",
+    `Total: ${stats.total}`,
+    `Encontradas: ${stats.owned}`,
+    `Faltando: ${stats.missing}`,
+    `Repetidas: ${stats.repeated}`,
+    `Progresso: ${stats.progress}%`,
+    "",
+    "==============================",
+    "FIGURINHAS QUE FALTAM",
+    "==============================",
+    "",
+    ...album.map((section) => {
+      const missing = section.stickers
+        .filter((sticker) => !sticker.owned)
+        .map((sticker) => sticker.number)
 
-  link.href = url;
-  link.download = "relatorio-album-copa-2026.txt";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
+      const have = section.stickers.filter((sticker) => sticker.owned).length
+      const total = section.stickers.length
 
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (missing.length === 0) {
+        return `${section.group === "ESPECIAIS" || section.group === "PROMO" ? section.group : `Grupo ${section.group}`} | ${section.code} - ${section.team} | COMPLETO`
+      }
+
+      return [
+        `${section.group === "ESPECIAIS" || section.group === "PROMO" ? section.group : `Grupo ${section.group}`} | ${section.code} - ${section.team} | ${have}/${total}`,
+        `FALTAM: ${missing.join(", ")}`,
+        "",
+      ].join("\n")
+    }),
+    "",
+    "==============================",
+    "REPETIDAS PARA TROCA",
+    "==============================",
+    "",
+    ...album.map((section) => {
+      const repeated = section.stickers
+        .filter((sticker) => Number(sticker.repeated || 0) > 0)
+        .map((sticker) => `${sticker.number} (${sticker.repeated}x)`)
+
+      if (repeated.length === 0) return ""
+
+      return [
+        `${section.code} - ${section.team}`,
+        `REPETIDAS: ${repeated.join(", ")}`,
+        "",
+      ].join("\n")
+    }),
+  ].join("\n")
+
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+
+  link.href = url
+  link.download = "figurinhas-faltantes-copa-2026.txt"
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 function runSelfTests() {
